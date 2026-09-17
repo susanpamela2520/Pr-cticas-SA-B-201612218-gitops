@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# Pod deliberadamente no conforme, para EVIDENCIAR el rechazo por politica.
+#
+# Viola las tres politicas a la vez:
+#   1. usa la etiqueta latest
+#   2. no declara requests ni limits
+#   3. no declara runAsNonRoot ni allowPrivilegeEscalation
+#
+# Uso:
+#   kubectl apply -f policies/pod-de-prueba-rechazado.yaml
+#
+# Kyverno debe rechazarlo. Esa salida es la evidencia del criterio
+# "Despliegue rechazado por politica".
+#
+# NO forma parte de la aplicacion: esta excluido de la Application de ArgoCD.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-no-conforme
+  namespace: sa-prod
+spec:
+  containers:
+    - name: infractor
+      image: nginx:latest

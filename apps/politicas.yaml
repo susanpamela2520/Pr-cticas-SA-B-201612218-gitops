@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Application de las politicas de admision
+#
+# Las politicas se administran como una Application aparte, por dos razones:
+#
+#   1. Son recursos de ambito de cluster (ClusterPolicy), no del namespace
+#      de la aplicacion.
+#   2. Deben poder actualizarse sin tocar el despliegue de la aplicacion, y
+#      viceversa.
+#
+# El pod de prueba no conforme queda excluido con la anotacion de exclusion,
+# para que ArgoCD no intente aplicarlo en cada sincronizacion.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sa-platform-politicas
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/susanpamela2520/Pr-cticas-SA-B-201612218-gitops.git
+    targetRevision: main
+    path: policies
+    directory:
+      # Aplica solo las politicas numeradas; deja fuera el pod de prueba,
+      # que se aplica a mano para evidenciar el rechazo.
+      include: "0*.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

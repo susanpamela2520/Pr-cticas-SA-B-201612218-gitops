@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# Argo Rollouts divide el trafico manipulando los selectores de estos dos
+# Services. El Rollout inyecta una etiqueta de hash de ReplicaSet en cada
+# uno para dirigir el trafico a la version estable o a la candidata.
+#
+# El Service publico (LoadBalancer) apunta al estable, de modo que el
+# usuario final solo ve la version promovida... salvo el porcentaje que el
+# canary dirige a la candidata a proposito.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-stable
+  namespace: sa-prod
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: api-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-canary
+  namespace: sa-prod
+spec:
+  # ClusterIP: el canary no se expone a internet directamente. El
+  # AnalysisTemplate lo consulta desde dentro del cluster.
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: api-gateway

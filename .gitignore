@@ -1,0 +1,5 @@
+# Secretos en claro: NUNCA se versionan.
+secretos.env
+values-secrets.yaml
+*.key
+pub-cert.pem

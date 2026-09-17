@@ -1,0 +1,135 @@
+# ---------------------------------------------------------------------------
+# Rollout canary del api-gateway
+#
+# Se eligió el api-gateway como servicio de entrega progresiva porque es el
+# único con IP pública: un defecto en él es inmediatamente visible para el
+# usuario, lo que hace la demostración del canary significativa en lugar de
+# teórica.
+#
+# La promoción avanza en tres pasos —20 %, 50 %, 100 %— y cada uno queda
+# condicionado a un AnalysisTemplate. Si el análisis falla en cualquier
+# paso, Argo Rollouts revierte automáticamente todo el tráfico a la versión
+# estable sin intervención humana.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api-gateway
+  namespace: sa-prod
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: sa-platform
+spec:
+  replicas: 5
+  revisionHistoryLimit: 5
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+
+  strategy:
+    canary:
+      # Servicios que Argo Rollouts manipula para dividir el tráfico.
+      canaryService: api-gateway-canary
+      stableService: api-gateway-stable
+
+      # El análisis corre EN PARALELO a los pasos, de modo que una
+      # degradación se detecta mientras el tráfico va subiendo, no después.
+      analysis:
+        templates:
+          - templateName: validacion-canary
+        startingStep: 1
+        args:
+          - name: servicio-canary
+            value: api-gateway-canary.sa-prod.svc.cluster.local
+
+      steps:
+        # --- Paso 1: 20 % del tráfico -----------------------------------
+        # Suficiente para que los errores aparezcan en las métricas, y
+        # acotado para que el daño sea limitado si la versión es mala.
+        - setWeight: 20
+        - pause: { duration: 2m }
+
+        # --- Paso 2: 50 % ------------------------------------------------
+        - setWeight: 50
+        - pause: { duration: 2m }
+
+        # --- Paso 3: 100 % -----------------------------------------------
+        # La pausa final da margen para que el análisis concluya antes de
+        # declarar la promoción exitosa.
+        - setWeight: 100
+        - pause: { duration: 1m }
+
+      # Ventana mínima antes de considerar un pod sano. Evita promover
+      # basándose en un pod que aún no ha atendido tráfico real.
+      scaleDownDelaySeconds: 60
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/part-of: sa-platform
+    spec:
+      # Exigido por la política require-run-as-nonroot de Kyverno.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: api-gateway
+          # Esta línea es la ÚNICA que el pipeline modifica, y lo hace
+          # mediante un Pull Request. El pipeline no tiene acceso al clúster.
+          image: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/api-gateway:v1.0.0
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          # Exigidos por la política require-resource-limits de Kyverno.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+          envFrom:
+            - configMapRef:
+                name: api-gateway-config
+            - secretRef:
+                # Secreto generado por Sealed Secrets: en el repositorio
+                # solo existe su versión cifrada.
+                name: sa-platform-secretos
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      # readOnlyRootFilesystem exige un volumen escribible para /tmp.
+      volumes:
+        - name: tmp
+          emptyDir: {}

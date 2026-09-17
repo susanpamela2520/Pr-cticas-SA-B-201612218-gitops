@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Application de ArgoCD
+#
+# Este objeto es el corazon del modelo GitOps: declara que el estado del
+# namespace sa-prod debe corresponder exactamente al contenido de la carpeta
+# rollouts/ de este repositorio.
+#
+# ArgoCD compara continuamente el estado deseado (este repositorio) con el
+# estado real (el cluster). Si difieren, la aplicacion aparece como OutOfSync
+# y --con selfHeal activado-- ArgoCD la corrige sola.
+#
+# Consecuencia practica: si alguien modifica algo a mano con kubectl, ArgoCD
+# lo revierte. Eso es exactamente lo que se busca: el repositorio es la unica
+# fuente de verdad, y una modificacion manual no trazable no sobrevive.
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sa-platform-gateway
+  namespace: argocd
+  finalizers:
+    # Garantiza que al borrar la Application se limpien tambien sus recursos
+    # en el cluster, en lugar de dejarlos huerfanos.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/susanpamela2520/Pr-cticas-SA-B-201612218-gitops.git
+    targetRevision: main
+    path: rollouts
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sa-prod
+
+  syncPolicy:
+    automated:
+      # Elimina del cluster lo que se borre del repositorio.
+      prune: true
+      # Revierte cualquier cambio manual hecho con kubectl.
+      selfHeal: true
+    syncOptions:
+      # El namespace lo crea Terraform, no ArgoCD: si ArgoCD lo creara,
+      # perderiamos las etiquetas que Kyverno usa para decidir donde
+      # bloquear.
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 3m
+
+  # Argo Rollouts manipula estos campos durante la promocion del canary.
+  # Sin ignorarlos, ArgoCD los veria como desvio del repositorio y entraria
+  # en conflicto con el propio rollout.
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/selector
+    - group: argoproj.io
+      kind: Rollout
+      jsonPointers:
+        - /spec/replicas
+
+  revisionHistoryLimit: 10

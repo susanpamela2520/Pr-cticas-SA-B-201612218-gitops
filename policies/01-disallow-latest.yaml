@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# Politica 1 de 3: prohibir la etiqueta latest
+#
+# POR QUE: latest es una etiqueta movil. Dos despliegues del mismo
+# manifiesto pueden traer codigo distinto, lo que rompe la reproducibilidad
+# y hace imposible saber que version esta corriendo. En un flujo GitOps,
+# donde el repositorio es la unica fuente de verdad, una etiqueta movil
+# significa que el repositorio NO describe el estado real del sistema.
+# ---------------------------------------------------------------------------
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Prohibir la etiqueta latest
+    policies.kyverno.io/category: Trazabilidad
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: requiere-etiqueta-explicita
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  sa-platform/aplicar-politicas: bloquear
+      validate:
+        message: >-
+          Rechazado: la imagen debe declarar una etiqueta explicita distinta
+          de latest. Use una version semantica derivada de un tag de Git
+          (por ejemplo v1.2.3) para que el manifiesto identifique de forma
+          inequivoca el codigo en ejecucion.
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+    - name: prohibe-imagen-sin-etiqueta
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  sa-platform/aplicar-politicas: bloquear
+      validate:
+        message: >-
+          Rechazado: la imagen no declara etiqueta, y Kubernetes la
+          interpretaria como latest.
+        pattern:
+          spec:
+            containers:
+              - image: "*:*"

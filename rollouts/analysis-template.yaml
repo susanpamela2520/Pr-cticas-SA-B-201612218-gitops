@@ -1,0 +1,164 @@
+# ---------------------------------------------------------------------------
+# AnalysisTemplate: la puerta de calidad del canary
+#
+# Este objeto es el que decide si la versión candidata se promueve o se
+# revierte. Ejecuta tres métricas contra el servicio canary mientras el
+# tráfico va subiendo.
+#
+# JUSTIFICACIÓN DE LOS UMBRALES
+#
+# Los valores no son arbitrarios: se derivan de la línea base medida en la
+# Práctica 6 con k6 (26.427 peticiones, 100 usuarios concurrentes):
+#
+#   - Tasa de error observada ........ 0,01 %  (4 de 26.427)
+#   - Latencia p95 ................... 222 ms
+#   - Latencia mediana ............... 122 ms
+#
+# Umbrales elegidos:
+#
+#   tasa-de-exito >= 99 %   El sistema ya demuestra 99,99 %. Un 99 % deja
+#                           margen para ruido de red sin tolerar una
+#                           regresión real: pasar de 0,01 % a 1 % de error
+#                           es un aumento de cien veces, no una fluctuación.
+#
+#   latencia p95 <= 500 ms  Poco más del doble de la línea base (222 ms).
+#                           Un canary corre junto a la versión estable y
+#                           comparte nodos, así que algo de degradación es
+#                           esperable; 500 ms detecta una regresión seria
+#                           sin dar falsos positivos por contención normal.
+#
+#   disponibilidad          Comprobación binaria: si /health no responde,
+#                           nada más importa. Se evalúa primero.
+#
+# CONSECUENCIA OPERATIVA
+#
+# failureLimit: 2 sobre intervalos de 30 s significa que una versión
+# defectuosa se revierte en aproximadamente un minuto, con un máximo de
+# 20 % del tráfico afectado (el peso del primer paso).
+# ---------------------------------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: validacion-canary
+  namespace: sa-prod
+spec:
+  args:
+    - name: servicio-canary
+
+  metrics:
+    # --- Métrica 1: disponibilidad ------------------------------------------
+    # La más simple y la que corta más rápido. Sin failureLimit: un solo
+    # fallo aborta la promoción, porque un /health que no responde no
+    # admite interpretación.
+    - name: disponibilidad
+      interval: 30s
+      count: 6
+      failureLimit: 0
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                serviceAccountName: analisis-rollouts
+                restartPolicy: Never
+                containers:
+                  - name: sonda
+                    image: curlimages/curl:8.11.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        CODIGO=$(curl -s -o /dev/null -w "%{http_code}" \
+                          --max-time 5 "http://{{args.servicio-canary}}:8080/health")
+                        echo "Codigo HTTP recibido: $CODIGO"
+                        [ "$CODIGO" = "200" ] || exit 1
+                    resources:
+                      requests: { cpu: 50m, memory: 64Mi }
+                      limits: { cpu: 100m, memory: 128Mi }
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      allowPrivilegeEscalation: false
+
+    # --- Métrica 2: tasa de éxito -------------------------------------------
+    # Envía 100 peticiones y exige que al menos 99 respondan 200.
+    - name: tasa-de-exito
+      interval: 30s
+      count: 6
+      failureLimit: 2
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                serviceAccountName: analisis-rollouts
+                restartPolicy: Never
+                containers:
+                  - name: medidor
+                    image: curlimages/curl:8.11.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        TOTAL=100
+                        EXITOS=0
+                        for i in $(seq 1 $TOTAL); do
+                          CODIGO=$(curl -s -o /dev/null -w "%{http_code}" \
+                            --max-time 5 "http://{{args.servicio-canary}}:8080/health" || echo "000")
+                          [ "$CODIGO" = "200" ] && EXITOS=$((EXITOS+1))
+                        done
+                        PORCENTAJE=$((EXITOS * 100 / TOTAL))
+                        echo "Exitos: $EXITOS/$TOTAL ($PORCENTAJE%)"
+                        echo "Umbral requerido: 99%"
+                        [ "$PORCENTAJE" -ge 99 ] || exit 1
+                    resources:
+                      requests: { cpu: 50m, memory: 64Mi }
+                      limits: { cpu: 200m, memory: 128Mi }
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      allowPrivilegeEscalation: false
+
+    # --- Métrica 3: latencia ------------------------------------------------
+    # Toma 20 muestras y calcula el percentil 95.
+    - name: latencia-p95
+      interval: 30s
+      count: 6
+      failureLimit: 2
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                serviceAccountName: analisis-rollouts
+                restartPolicy: Never
+                containers:
+                  - name: cronometro
+                    image: curlimages/curl:8.11.0
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - |
+                        UMBRAL_MS=500
+                        for i in $(seq 1 20); do
+                          curl -s -o /dev/null -w "%{time_total}\n" \
+                            --max-time 5 "http://{{args.servicio-canary}}:8080/health" \
+                            2>/dev/null || echo "5.0"
+                        done | sort -n > /tmp/muestras.txt
+
+                        # Percentil 95 de 20 muestras = la muestra 19
+                        P95_SEG=$(sed -n '19p' /tmp/muestras.txt)
+                        P95_MS=$(awk "BEGIN {printf \"%d\", $P95_SEG * 1000}")
+
+                        echo "Latencia p95 medida: ${P95_MS} ms"
+                        echo "Umbral permitido:    ${UMBRAL_MS} ms"
+                        echo "Linea base de la P6: 222 ms"
+
+                        [ "$P95_MS" -le "$UMBRAL_MS" ] || exit 1
+                    resources:
+                      requests: { cpu: 50m, memory: 64Mi }
+                      limits: { cpu: 200m, memory: 128Mi }
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      allowPrivilegeEscalation: false

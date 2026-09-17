@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+# Politica 2 de 3: exigir limites de CPU y memoria
+#
+# POR QUE: sin requests, el planificador no sabe cuanto reservar y puede
+# sobrecargar un nodo. Sin limits, un pod con una fuga de memoria puede
+# consumir el nodo completo y tumbar a sus vecinos.
+#
+# Ademas el HPA necesita requests de CPU para calcular el porcentaje de uso:
+# sin ellos el autoescalado no funciona. Esto se vivio en la Practica 6.
+# ---------------------------------------------------------------------------
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Exigir limites de CPU y memoria
+    policies.kyverno.io/category: Estabilidad
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: requiere-requests-y-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  sa-platform/aplicar-politicas: bloquear
+      validate:
+        message: >-
+          Rechazado: todo contenedor debe declarar resources.requests y
+          resources.limits para CPU y memoria. Sin requests el HPA no puede
+          calcular el uso; sin limits un contenedor puede agotar el nodo.
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"

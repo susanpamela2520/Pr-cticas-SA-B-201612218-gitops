@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# Politica 3 de 3: exigir ejecucion sin privilegios de root
+#
+# POR QUE: un contenedor que corre como root y logra escapar del
+# aislamiento obtiene privilegios de root en el NODO, no solo dentro del
+# contenedor. Correr sin privilegios reduce el alcance de una
+# vulnerabilidad en la aplicacion o en sus dependencias.
+#
+# Se exige tambien allowPrivilegeEscalation: false, porque sin ello un
+# proceso podria elevar privilegios mediante binarios setuid aunque el
+# contenedor arranque como usuario no root.
+# ---------------------------------------------------------------------------
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-run-as-nonroot
+  annotations:
+    policies.kyverno.io/title: Exigir ejecucion sin root
+    policies.kyverno.io/category: Seguridad del pod
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: requiere-runasnonroot
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  sa-platform/aplicar-politicas: bloquear
+      validate:
+        message: >-
+          Rechazado: el pod debe declarar runAsNonRoot true, en el
+          securityContext del pod o en el de cada contenedor.
+        anyPattern:
+          - spec:
+              securityContext:
+                runAsNonRoot: true
+          - spec:
+              containers:
+                - securityContext:
+                    runAsNonRoot: true
+    - name: prohibe-escalada-de-privilegios
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  sa-platform/aplicar-politicas: bloquear
+      validate:
+        message: >-
+          Rechazado: allowPrivilegeEscalation debe ser false.
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: "false"
