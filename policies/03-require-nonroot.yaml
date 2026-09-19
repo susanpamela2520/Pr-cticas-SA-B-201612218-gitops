@@ -55,8 +55,9 @@ spec:
       validate:
         message: >-
           Rechazado: allowPrivilegeEscalation debe ser false.
-        pattern:
-          spec:
-            containers:
-              - securityContext:
-                  allowPrivilegeEscalation: false
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.containers[?securityContext.allowPrivilegeEscalation != `false`] | length(@) }}"
+                operator: GreaterThan
+                value: 0
