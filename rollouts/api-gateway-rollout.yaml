@@ -20,7 +20,7 @@ metadata:
     app.kubernetes.io/name: api-gateway
     app.kubernetes.io/part-of: sa-platform
 spec:
-  replicas: 5
+  replicas: 4
   revisionHistoryLimit: 5
 
   # Si el despliegue agota su plazo sin progresar, se aborta y se revierte
