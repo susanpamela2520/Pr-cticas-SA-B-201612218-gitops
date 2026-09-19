@@ -59,4 +59,4 @@ spec:
           spec:
             containers:
               - securityContext:
-                  allowPrivilegeEscalation: "false"
+                  allowPrivilegeEscalation: false
