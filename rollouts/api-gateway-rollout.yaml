@@ -23,6 +23,11 @@ spec:
   replicas: 5
   revisionHistoryLimit: 5
 
+  # Si el despliegue agota su plazo sin progresar, se aborta y se revierte
+  # al estable en lugar de quedarse detenido en estado Degraded.
+  progressDeadlineSeconds: 300
+  progressDeadlineAbort: true
+
   selector:
     matchLabels:
       app.kubernetes.io/name: api-gateway
@@ -42,7 +47,6 @@ spec:
         args:
           - name: servicio-canary
             value: api-gateway-canary.sa-prod.svc.cluster.local
-                  progressDeadlineAbort: true
 
       steps:
         # --- Paso 1: 20 % del tráfico -----------------------------------
@@ -60,7 +64,6 @@ spec:
         # declarar la promoción exitosa.
         - setWeight: 100
         - pause: { duration: 1m }
-        - progressDeadlineAbort: true
 
   template:
     metadata:
@@ -82,50 +85,3 @@ spec:
           image: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/api-gateway:v1.1.9
 
           ports:
-            - name: http
-              containerPort: 8080
-
-          # Exigidos por la política require-resource-limits de Kyverno.
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
-          
-          readinessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 3
-
-          livenessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 10
-
-          envFrom:
-            - configMapRef:
-                name: api-gateway-config
-            - secretRef:
-                # Secreto generado por Sealed Secrets: en el repositorio
-                # solo existe su versión cifrada.
-                name: sa-platform-secretos
-
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-
-      # readOnlyRootFilesystem exige un volumen escribible para /tmp.
-      volumes:
-        - name: tmp
-          emptyDir: {}
