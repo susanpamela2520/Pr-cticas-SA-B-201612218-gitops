@@ -60,10 +60,6 @@ spec:
         - setWeight: 100
         - pause: { duration: 1m }
 
-      # Ventana mínima antes de considerar un pod sano. Evita promover
-      # basándose en un pod que aún no ha atendido tráfico real.
-      scaleDownDelaySeconds: 60
-
   template:
     metadata:
       labels:
