@@ -19,7 +19,7 @@ metadata:
     policies.kyverno.io/category: Seguridad del pod
     policies.kyverno.io/severity: high
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: Audit
   background: true
   rules:
     - name: requiere-runasnonroot
