@@ -82,6 +82,6 @@ spec:
         - name: api-gateway
           # Esta línea es la ÚNICA que el pipeline modifica, y lo hace
           # mediante un Pull Request. El pipeline no tiene acceso al clúster.
-          image: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/api-gateway:v1.1.9
+          image: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/api-gateway:v1.2.0
 
           ports:
