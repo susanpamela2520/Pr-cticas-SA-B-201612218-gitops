@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: sa-prod
+data:
+  PORT: "8080"
+  LOG_LEVEL: "info"
+  AUTH_SERVICE_URL: "http://sa-platform-auth-service:3001"
+  TICKETS_SERVICE_URL: "http://sa-platform-tickets-service:8001"
+  COMENTARIOS_SERVICE_URL: "http://sa-platform-comentarios-service:3002"
+  NOTIFICACIONES_SERVICE_URL: "http://sa-platform-notificaciones-service:8002"
