@@ -1,0 +1,35 @@
+## Ambiente de PRODUCCION (namespace sa-prod).
+## Kyverno opera aqui en modo Enforce: un manifiesto no conforme es
+## rechazado en la admision, no solo registrado.
+
+global:
+  secretoExterno: sa-platform-secretos
+  logLevel: info
+
+api-gateway:
+  replicaCount: 4
+  image:
+    # UNICA linea que el pipeline modifica, y lo hace mediante un Pull
+    # Request. El pipeline no tiene acceso al cluster.
+    tag: v1.1.9
+  rollout:
+    enabled: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+auth-service:
+  replicaCount: 2
+tickets-service:
+  replicaCount: 2
+comentarios-service:
+  replicaCount: 2
+notificaciones-service:
+  replicaCount: 1
+
+db:
+  storage:
+    size: 5Gi
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits:   { cpu: 1, memory: 1Gi }

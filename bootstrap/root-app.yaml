@@ -1,0 +1,33 @@
+# APLICACION RAIZ - patron app-of-apps.
+# Es lo unico que se aplica a mano durante una reconstruccion. Apunta a
+# apps/, donde vive una Application por componente; ArgoCD las crea a todas
+# y cada una levanta su parte, en el orden que fijan las sync-waves:
+#   wave 0  politicas de admision (antes que los pods)
+#   wave 1  secretos cifrados
+#   wave 2  plataforma
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sa-platform-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/susanpamela2520/Pr-cticas-SA-B-201612218-gitops.git
+    targetRevision: main
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

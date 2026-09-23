@@ -1,0 +1,36 @@
+## Ambiente de STAGING (namespace sa-staging).
+## Kyverno opera aqui en modo Audit: registra lo no conforme sin bloquear,
+## de modo que una violacion se detecta antes de produccion sin quedarse
+## sin ambiente de pruebas.
+##
+## El canary esta desactivado: en staging interesa que la version nueva
+## este disponible de inmediato, no acotar el riesgo de un trafico que no
+## existe.
+
+global:
+  secretoExterno: sa-platform-secretos
+  logLevel: debug
+
+api-gateway:
+  replicaCount: 1
+  rollout:
+    enabled: false
+  podDisruptionBudget:
+    enabled: false
+  antiAfinidad:
+    enabled: false
+  service:
+    type: ClusterIP
+
+auth-service:
+  replicaCount: 1
+tickets-service:
+  replicaCount: 1
+comentarios-service:
+  replicaCount: 1
+notificaciones-service:
+  replicaCount: 1
+
+db:
+  storage:
+    size: 1Gi
