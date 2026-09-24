@@ -22,6 +22,23 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
     spec:
+      # Reparte las replicas entre nodos distintos. Sin esto, el
+      # PodDisruptionBudget no protege nada: si las dos replicas viven en el
+      # mismo nodo, ese nodo se lleva ambas de golpe.
+      #
+      # "preferred" y no "required": con required, si hay menos nodos que
+      # replicas, los pods sobrantes quedan en Pending para siempre, lo que
+      # convierte una mejora de disponibilidad en una caida.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: tickets-service
+                    app.kubernetes.io/instance: {{ .Release.Name }}
       serviceAccountName: {{ include "sa-platform.fullname" (dict "root" $ "name" "tickets-service") }}
       securityContext:
         runAsNonRoot: true
