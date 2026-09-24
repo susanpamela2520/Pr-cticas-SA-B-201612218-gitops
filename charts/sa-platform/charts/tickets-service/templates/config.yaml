@@ -8,6 +8,7 @@ data:
   PORT: {{ .Values.containerPort | quote }}
   COLA_TICKETS_RESUELTOS: {{ .Values.global.rabbitmqQueueTicketsResueltos | default "tickets.resueltos" | quote }}
   COLA_RESUMENES_CRON: {{ .Values.global.rabbitmqQueueResumenesCron | default "cron.resumenes" | quote }}
+{{- if not .Values.global.secretoExterno }}
 ---
 apiVersion: v1
 kind: Secret
@@ -23,3 +24,4 @@ stringData:
   DATABASE_URL: {{ printf "postgresql://%s:%s@%s:5432/%s" .Values.global.dbUsername .Values.global.dbPassword (include "sa-platform.fullname" (dict "root" $ "name" "db")) .Values.global.dbName | quote }}
   RABBITMQ_URL: {{ printf "amqp://%s:%s@%s:5672/%%2F" .Values.global.rabbitmqUsername .Values.global.rabbitmqPassword (include "sa-platform.fullname" (dict "root" $ "name" "broker")) | quote }}
   JWT_SECRET: {{ .Values.global.jwtSecret | quote }}
+{{- end }}

@@ -13,6 +13,7 @@ data:
   JWT_RENOVACION_GRACIA_SEGUNDOS: {{ .Values.global.jwtRenovacionGraciaSegundos | default 300 | quote }}
   LOG_LEVEL: {{ .Values.global.logLevel | default "info" | quote }}
   COOKIE_SECURE: "false"
+{{- if not .Values.global.secretoExterno }}
 ---
 apiVersion: v1
 kind: Secret
@@ -27,3 +28,4 @@ stringData:
   JWT_SECRET: {{ .Values.global.jwtSecret | quote }}
   AES_KEY_HEX: {{ .Values.global.aesKeyHex | quote }}
   CORREO_HASH_SECRET: {{ .Values.global.correoHashSecret | quote }}
+{{- end }}

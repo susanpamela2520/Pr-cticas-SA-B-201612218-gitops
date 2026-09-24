@@ -7,6 +7,7 @@ metadata:
 data:
   PORT: {{ .Values.containerPort | quote }}
   COLA_TICKETS_RESUELTOS: {{ .Values.global.rabbitmqQueueTicketsResueltos | default "tickets.resueltos" | quote }}
+{{- if not .Values.global.secretoExterno }}
 ---
 apiVersion: v1
 kind: Secret
@@ -17,3 +18,4 @@ metadata:
 type: Opaque
 stringData:
   RABBITMQ_URL: {{ printf "amqp://%s:%s@%s:5672/%%2F" .Values.global.rabbitmqUsername .Values.global.rabbitmqPassword (include "sa-platform.fullname" (dict "root" $ "name" "broker")) | quote }}
+{{- end }}

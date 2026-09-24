@@ -10,6 +10,7 @@ data:
   DB_PORT: "5432"
   DB_NAME: {{ .Values.global.dbName | quote }}
   LOG_LEVEL: {{ .Values.global.logLevel | default "info" | quote }}
+{{- if not .Values.global.secretoExterno }}
 ---
 apiVersion: v1
 kind: Secret
@@ -22,3 +23,4 @@ stringData:
   DB_USER: {{ .Values.global.dbUsername | quote }}
   DB_PASSWORD: {{ .Values.global.dbPassword | quote }}
   JWT_SECRET: {{ .Values.global.jwtSecret | quote }}
+{{- end }}
