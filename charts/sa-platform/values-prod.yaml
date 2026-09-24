@@ -33,3 +33,38 @@ db:
   resources:
     requests: { cpu: 200m, memory: 256Mi }
     limits:   { cpu: 1, memory: 1Gi }
+
+## Rutas de las imagenes publicadas en GHCR. El pipeline actualiza
+## unicamente el tag del api-gateway, mediante un Pull Request.
+
+## Rutas de las imagenes en GHCR. Se usa el tag "main" y nunca "latest":
+## una etiqueta movil hace que el repositorio deje de describir el estado
+## real del cluster, y la politica disallow-latest-tag la rechaza.
+api-gateway:
+  image:
+    repository: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/api-gateway
+    tag: v1.1.9
+
+auth-service:
+  image:
+    repository: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/auth-service
+    tag: main
+
+tickets-service:
+  image:
+    repository: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/tickets-service
+    tag: main
+
+comentarios-service:
+  image:
+    repository: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/comentarios-service
+    tag: main
+
+notificaciones-service:
+  image:
+    repository: ghcr.io/susanpamela2520/pr-cticas-sa-b-201612218/notificaciones-service
+    tag: main
+
+## Los CronJobs quedan fuera: su imagen no esta publicada en el registro.
+cronjobs:
+  enabled: false

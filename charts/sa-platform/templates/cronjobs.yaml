@@ -1,3 +1,9 @@
+{{- if .Values.cronjobs.enabled }}
+# CronJobs de reporteria.
+#
+# Desactivados en la P8: su imagen no esta publicada en el registro,
+# y una referencia a una imagen inexistente dejaria pods en
+# ImagePullBackOff sin aportar nada a la practica.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -208,3 +214,4 @@ spec:
               configMap:
                 name: {{ include "sa-platform.fullname" (dict "root" $ "name" "cronjob-scripts") }}
                 defaultMode: 0555
+{{- end }}
